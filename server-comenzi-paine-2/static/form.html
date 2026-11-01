@@ -1,0 +1,33 @@
+<!DOCTYPE html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Comandă pâine – ÎI Brăicău Mihai</title>
+<style>body{margin:0;background:#faf6ef;color:#2b2118;font:16px/1.45 system-ui,sans-serif}main{max-width:560px;margin:0 auto;padding:20px 16px 40px}
+.card{background:#fff;border:1px solid #e4d9c8;border-radius:14px;padding:14px;margin-bottom:14px}label{display:block;font-size:.85rem;color:#7a6b5b;margin:10px 0 4px}
+input,textarea,select{width:100%;box-sizing:border-box;padding:11px;border:1px solid #e4d9c8;border-radius:10px;font:inherit}
+.row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eee}.row input{width:70px;text-align:center}
+button{width:100%;padding:14px;border:0;border-radius:12px;background:#b5651d;color:#fff;font:inherit;font-weight:600;margin-top:8px}
+a.dl{display:block;padding:12px;margin-top:8px;border:1px solid #b5651d;border-radius:12px;text-align:center;color:#b5651d;text-decoration:none;font-weight:600}
+.err{color:#c62828}.ok{color:#2e7d32}</style></head><body><main>
+<h1 style="margin:0">Comandă pâine</h1><p style="color:#7a6b5b;margin:2px 0 16px">Furnizor: <b>ÎI Brăicău Mihai</b></p>
+<div class="card"><label>Denumire firmă / magazin *</label><input id="name"><label>CUI</label><input id="cui"><label>Telefon *</label><input id="phone" type="tel">
+<label>Email</label><input id="email" type="email"><label>Adresă (stradă, nr.)</label><input id="address"><label>Localitate *</label><input id="locality"><label>Județ *</label><select id="county"></select>
+<label>Data livrării (= data facturii) *</label><input id="date" type="date"></div>
+<div class="card"><b>Produse (bucăți)</b><div id="list"></div></div>
+<div class="card"><label style="margin:0">Observații</label><textarea id="notes"></textarea>
+<label style="display:flex;gap:10px;align-items:center;color:#2b2118"><input type="checkbox" id="cash" style="width:22px;height:22px"> Plată numerar la livrare (cu chitanță)</label></div>
+<div class="err" id="err"></div><button id="go">Trimite comanda</button><div id="res"></div></main>
+<script>
+var $=function(i){return document.getElementById(i)},prods=[];
+fetch("/api/config").then(function(r){return r.json()}).then(function(c){prods=c.products;
+ $("list").innerHTML=prods.map(function(p){return '<div class="row"><span>'+p.name+'</span><input type="number" inputmode="numeric" min="0" value="0" id="q_'+p.id+'"></div>'}).join("");
+ $("county").innerHTML=Object.keys(c.counties).map(function(k){return '<option value="'+k+'"'+(k=="VN"?" selected":"")+'>'+c.counties[k]+'</option>'}).join("")});
+var t=new Date();t.setDate(t.getDate()+1);$("date").min=new Date().toISOString().slice(0,10);$("date").value=t.toISOString().slice(0,10);
+$("go").onclick=function(){
+ $("err").textContent="";$("go").disabled=true;
+ var b={client:{},date:$("date").value,notes:$("notes").value,cash:$("cash").checked,items:prods.map(function(p){return{id:p.id,qty:parseInt($("q_"+p.id).value,10)||0}})};
+ ["name","cui","phone","email","address","locality","county"].forEach(function(k){b.client[k]=$(k).value});
+ fetch("/api/order",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)}).then(function(r){return r.json()}).then(function(d){
+  $("go").disabled=false;if(!d.ok){$("err").textContent=d.error;return}
+  var h='<p class="ok"><b>Comanda nr. '+d.no+' a fost înregistrată.</b> Factura: '+d.invoice+'</p>';
+  d.files.forEach(function(f){var u=URL.createObjectURL(new Blob([Uint8Array.from(atob(f.b64),function(c){return c.charCodeAt(0)})],{type:"application/pdf"}));h+='<a class="dl" download="'+f.name+'" href="'+u+'">Descarcă '+f.name+'</a>'});
+  $("res").innerHTML=h;window.scrollTo(0,document.body.scrollHeight)}).catch(function(){$("go").disabled=false;$("err").textContent="Eroare de conexiune. Încearcă din nou."})};
+</script></body></html>
